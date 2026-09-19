@@ -1,3 +1,4 @@
+from utils.audio_policy import flac_only
 import json
 import traceback
 import os
@@ -1632,6 +1633,8 @@ Searching and browsing metadata does NOT require authentication.
         return self._get_track_download_librespot(**kwargs)
 
     def _get_track_download_librespot(self, **kwargs) -> Optional[TrackDownloadInfo]:
+        if flac_only():
+            raise ValueError("FLAC only: Spotify audio download disabled; this implementation uses lossy audio")
         """Download track audio via librespot session (OAuth + Vorbis)."""
         track_id_base62 = kwargs.get("track_id_str") or kwargs.get("track_id")
         quality_tier = kwargs.get("quality_tier")
@@ -3030,6 +3033,8 @@ Searching and browsing metadata does NOT require authentication.
         return self._get_episode_download_librespot(**kwargs)
 
     def _get_episode_download_pathfinder(self, **kwargs) -> Optional[TrackDownloadInfo]:
+        if flac_only():
+            raise ValueError("FLAC only: Spotify audio download disabled; this implementation uses lossy audio")
         """Download episode audio via storage-resolve + static episode AES key (votify)."""
         from Crypto.Cipher import AES
         from Crypto.Util import Counter
@@ -3123,6 +3128,8 @@ Searching and browsing metadata does NOT require authentication.
         ) from last_error
 
     def _get_episode_download_librespot(self, **kwargs) -> Optional[TrackDownloadInfo]:
+        if flac_only():
+            raise ValueError("FLAC only: Spotify audio download disabled; this implementation uses lossy audio")
         episode_id_base62 = kwargs.get("track_id_str") or kwargs.get("track_id") or kwargs.get("episode_id")
         quality_tier = kwargs.get("quality_tier")
         track_info_obj = kwargs.get("track_info_obj")
