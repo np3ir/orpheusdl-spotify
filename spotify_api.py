@@ -2423,14 +2423,24 @@ Searching and browsing metadata does NOT require authentication.
             self.logger.info("Playlist is empty anonymously and no saved Spotify session; "
                              "log in once so personal playlists can be read.")
             return None
+        opened_here = not self.librespot_session
         try:
-            if not self.librespot_session and not self.authenticate_stream_api():
+            if opened_here and not self.authenticate_stream_api():
                 return None
             token = self.librespot_session.tokens().get("playlist-read")
             playlist_v2 = self.embed_client.get_playlist_metadata(playlist_id, external_token=token).get("playlistV2")
         except Exception as e:
             self.logger.warning(f"Could not read playlist {playlist_id} with the user session: {e}")
             return None
+        finally:
+            # The session was opened only for the token: close it, or its idle
+            # connection drops later and librespot logs "Failed reading packet".
+            if opened_here and self.librespot_session:
+                try:
+                    self.librespot_session.close()
+                except Exception:
+                    pass
+                self.librespot_session = None
         if playlist_v2 and (playlist_v2.get('content') or {}).get('items'):
             self.logger.info(f"Playlist {playlist_id} read with the user session (personal playlist).")
             return playlist_v2
