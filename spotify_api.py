@@ -2415,6 +2415,37 @@ Searching and browsing metadata does NOT require authentication.
             self.logger.error(f"Unexpected error in get_album_info for {album_id}: {e}", exc_info=True)
             raise SpotifyApiError(f"An unexpected error occurred while fetching album {album_id}: {e}")
 
+    def _playlist_with_user_session(self, playlist_id: str) -> Optional[dict]:
+        """Personal playlists (Release Radar, Discover Weekly, Daily Mix...) come back empty
+        when read anonymously. Retry with the account session saved in credentials.json.
+        Never starts a browser login: without saved credentials it returns None."""
+        if not os.path.exists(self.credentials_file_path):
+            self.logger.info("Playlist is empty anonymously and no saved Spotify session; "
+                             "log in once so personal playlists can be read.")
+            return None
+        opened_here = not self.librespot_session
+        try:
+            if opened_here and not self.authenticate_stream_api():
+                return None
+            token = self.librespot_session.tokens().get("playlist-read")
+            playlist_v2 = self.embed_client.get_playlist_metadata(playlist_id, external_token=token).get("playlistV2")
+        except Exception as e:
+            self.logger.warning(f"Could not read playlist {playlist_id} with the user session: {e}")
+            return None
+        finally:
+            # The session was opened only for the token: close it, or its idle
+            # connection drops later and librespot logs "Failed reading packet".
+            if opened_here and self.librespot_session:
+                try:
+                    self.librespot_session.close()
+                except Exception:
+                    pass
+                self.librespot_session = None
+        if playlist_v2 and (playlist_v2.get('content') or {}).get('items'):
+            self.logger.info(f"Playlist {playlist_id} read with the user session (personal playlist).")
+            return playlist_v2
+        return None
+
     def get_playlist_info(self, playlist_id: str, metadata: Optional['PlaylistInfo'] = None, _retry_attempted: bool = False) -> Optional[dict]:
         self.logger.info(f"SpotifyAPI: Attempting to get playlist info (Embed API) for ID: {playlist_id}")
 
@@ -2426,6 +2457,9 @@ Searching and browsing metadata does NOT require authentication.
             if not playlist_v2:
                 self.logger.warning(f"No playlist data returned from Embed API for ID: {playlist_id}.")
                 raise SpotifyItemNotFoundError(f"Playlist with ID {playlist_id} not found.")
+
+            if not (playlist_v2.get('content') or {}).get('items'):
+                playlist_v2 = self._playlist_with_user_session(playlist_id) or playlist_v2
             
             name = playlist_v2.get('name')
 

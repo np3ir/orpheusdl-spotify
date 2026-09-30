@@ -432,7 +432,7 @@ class SpotifyEmbedClient:
                 self.logger.debug(f"Fetching next page of playlist tracks (offset: {offset})")
                 
                 variables["offset"] = offset
-                page_response = self._graphql_query("fetchPlaylist", variables)
+                page_response = self._graphql_query("fetchPlaylist", variables, external_token=external_token)
                 
                 page_items = page_response.get("data", {}).get("playlistV2", {}).get("content", {}).get("items", [])
                 if not page_items:
